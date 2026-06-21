@@ -1,4 +1,3 @@
-# nail-salon-backend/Cargo.toml
 [package]
 name = "nail-salon-backend"
 version = "0.1.0"
