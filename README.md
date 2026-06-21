@@ -1,48 +1,50 @@
 # nail-salon-backend
 
-Axum + sqlx + PostgreSQL + async-stripe 기반 네일샵 예약·결제 백엔드
+Axum + sqlx + PostgreSQL 기반 네일샵 예약 백엔드
 
 ## 기술 스택
 
-- **Framework**: Axum 0.8
-- **Database**: PostgreSQL + sqlx 0.8
-- **Payment**: async-stripe 0.40
-- **Auth**: JWT (jsonwebtoken)
-- **Runtime**: Tokio
+- Axum 0.8
+- PostgreSQL + sqlx 0.8
+- Tokio
+- JWT
+- AES-256-GCM (소셜 식별 ID 암호화)
+
+## 주요 기능
+
+- 네이버 / 카카오 소셜 로그인 연동 구조
+- 네이버+카카오 동시 연동 지원
+- 사용자 / 관리자 권한 분리
+- 시술 카테고리 / 시술 관리
+- 예약 생성 / 조회 / 취소
+- 즉시 결제 / 현장 결제 구조 지원
+- 고정 휴무 / 임시 휴무 관리
+- 예약 가능 슬롯 조회
+- PostgreSQL EXCLUDE 제약 기반 더블 부킹 방지
 
 ## 프로젝트 구조
 
 ```
 src/
-├── domain/          # Entity, 도메인 모델
-├── application/     # UseCase, 비즈니스 로직
-├── infrastructure/  # DB 구현체, Stripe 클라이언트
-└── presentation/    # Axum Router, Handler, DTO
+├── domain/
+├── application/
+├── infrastructure/
+└── presentation/
 ```
 
 ## 시작하기
 
 ```bash
-# 환경변수 설정
 cp .env.example .env
-# .env 파일 편집
-
-# DB 마이그레이션
 sqlx migrate run
-
-# 서버 실행
 cargo run
 ```
 
-## API 엔드포인트
+## 기본 엔드포인트
 
-| Method | Path | 설명 |
-|---|---|---|
-| GET | /health | 헬스체크 |
-| GET | /api/services | 서비스 목록 |
-| GET | /api/services/:id | 서비스 상세 |
-| GET | /api/bookings | 예약 목록 |
-| POST | /api/bookings | 예약 생성 |
-| GET | /api/bookings/:id | 예약 상세 |
-| POST | /api/payments/intent | 결제 Intent 생성 |
-```
+- GET /health
+- GET /api/categories
+- GET /api/services
+- GET /api/bookings/available-slots?date=2026-06-25&service_id=UUID
+- GET /api/bookings/my
+- POST /api/bookings

@@ -4,13 +4,12 @@ mod application;
 mod infrastructure;
 mod presentation;
 
-use axum::Router;
+use dotenvy::dotenv;
 use sqlx::postgres::PgPoolOptions;
+use std::env;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use dotenvy::dotenv;
-use std::env;
 
 #[tokio::main]
 async fn main() {
@@ -36,10 +35,9 @@ async fn main() {
         .await
         .expect("Failed to run migrations");
 
-    let app = Router::new()
+    let app = presentation::routes::create_router(pool)
         .layer(CorsLayer::permissive())
-        .layer(TraceLayer::new_for_http())
-        .with_state(pool);
+        .layer(TraceLayer::new_for_http());
 
     let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
