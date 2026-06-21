@@ -1,14 +1,13 @@
-// src/domain/user_social_account.rs
+// src/domain/refresh_token.rs
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct UserSocialAccount {
+pub struct RefreshToken {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub provider: String,
-    pub provider_id_encrypted: String,
-    pub provider_id_hash: String,
+    pub token_hash: String,
+    pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
 }
