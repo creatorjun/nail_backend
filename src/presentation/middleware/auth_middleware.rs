@@ -1,5 +1,5 @@
 // src/presentation/middleware/auth_middleware.rs
-use crate::infrastructure::jwt::{verify_access_token, Claims};
+use crate::infrastructure::jwt::verify_access_token;
 use axum::{
     extract::Request,
     http::{header, StatusCode},

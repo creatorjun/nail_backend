@@ -1,6 +1,6 @@
 // src/infrastructure/social/kakao.rs
 use super::SocialProfile;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::Deserialize;
 use std::env;
 

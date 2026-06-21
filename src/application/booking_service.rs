@@ -2,7 +2,7 @@
 use crate::domain::booking::{AvailableSlotsResponse, Booking, CreateBookingRequest, TimeSlot};
 use crate::domain::service::Service;
 use crate::domain::shop_settings::ShopSettings;
-use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -53,6 +53,12 @@ pub async fn get_booking_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Booking
         .await
 }
 
+fn parse_time(s: &str) -> Option<NaiveTime> {
+    NaiveTime::parse_from_str(s, "%H:%M")
+        .or_else(|_| NaiveTime::parse_from_str(s, "%H:%M:%S"))
+        .ok()
+}
+
 pub async fn get_available_slots(
     pool: &PgPool,
     date: NaiveDate,
@@ -70,19 +76,21 @@ pub async fn get_available_slots(
     let weekday = date.weekday().num_days_from_sunday() as i32;
     let is_closed_weekday = settings.closed_weekdays.iter().any(|day| *day == weekday);
 
-    let is_closed_day: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM closed_days WHERE closed_date = $1)",
-    )
-    .bind(date)
-    .fetch_one(pool)
-    .await?;
+    let is_closed_day: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM closed_days WHERE closed_date = $1)")
+            .bind(date)
+            .fetch_one(pool)
+            .await?;
 
     if is_closed_weekday || is_closed_day {
         return Ok(AvailableSlotsResponse { date, slots: vec![] });
     }
 
-    let day_start = Utc.from_utc_datetime(&NaiveDateTime::new(date, settings.open_time));
-    let day_end = Utc.from_utc_datetime(&NaiveDateTime::new(date, settings.close_time));
+    let open_naive = parse_time(&settings.open_time).unwrap_or_else(|| NaiveTime::from_hms_opt(10, 0, 0).unwrap());
+    let close_naive = parse_time(&settings.close_time).unwrap_or_else(|| NaiveTime::from_hms_opt(20, 0, 0).unwrap());
+
+    let day_start = Utc.from_utc_datetime(&NaiveDateTime::new(date, open_naive));
+    let day_end = Utc.from_utc_datetime(&NaiveDateTime::new(date, close_naive));
 
     let bookings = sqlx::query_as::<_, Booking>(
         "SELECT * FROM bookings
@@ -103,7 +111,9 @@ pub async fn get_available_slots(
 
     while current + service_duration <= day_end {
         let candidate_end = current + service_duration;
-        let overlapped = bookings.iter().any(|booking| current < booking.end_at && candidate_end > booking.scheduled_at);
+        let overlapped = bookings
+            .iter()
+            .any(|b| current < b.end_at && candidate_end > b.scheduled_at);
 
         slots.push(TimeSlot {
             start: current,

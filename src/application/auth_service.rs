@@ -1,6 +1,6 @@
 // src/application/auth_service.rs
 use crate::domain::user::User;
-use crate::infrastructure::crypto::{decrypt_social_id, encrypt_social_id};
+use crate::infrastructure::crypto::encrypt_social_id;
 use crate::infrastructure::jwt::issue_access_token;
 use crate::infrastructure::social::SocialProfile;
 use anyhow::{anyhow, Result};

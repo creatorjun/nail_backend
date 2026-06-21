@@ -167,24 +167,36 @@ pub async fn get_all_closed_days(pool: &PgPool) -> Result<Vec<ClosedDay>, sqlx::
 }
 
 pub async fn get_shop_settings(pool: &PgPool) -> Result<ShopSettings, sqlx::Error> {
-    sqlx::query_as::<_, ShopSettings>("SELECT * FROM shop_settings LIMIT 1")
-        .fetch_one(pool)
-        .await
+    sqlx::query_as::<_, ShopSettings>(
+        "SELECT id, shop_name, closed_weekdays,
+                open_time::TEXT, close_time::TEXT,
+                slot_interval_min, max_booking_days,
+                created_at, updated_at
+         FROM shop_settings LIMIT 1",
+    )
+    .fetch_one(pool)
+    .await
 }
 
 pub async fn update_shop_settings(
     pool: &PgPool,
     shop_name: &str,
     closed_weekdays: Vec<i32>,
-    open_time: sqlx::types::time::Time,
-    close_time: sqlx::types::time::Time,
+    open_time: &str,
+    close_time: &str,
     slot_interval_min: i32,
     max_booking_days: i32,
 ) -> Result<ShopSettings, sqlx::Error> {
     sqlx::query_as::<_, ShopSettings>(
-        "UPDATE shop_settings SET shop_name=$1, closed_weekdays=$2, open_time=$3,
-         close_time=$4, slot_interval_min=$5, max_booking_days=$6, updated_at=NOW()
-         RETURNING *",
+        "UPDATE shop_settings
+         SET shop_name=$1, closed_weekdays=$2,
+             open_time=$3::TIME, close_time=$4::TIME,
+             slot_interval_min=$5, max_booking_days=$6,
+             updated_at=NOW()
+         RETURNING id, shop_name, closed_weekdays,
+                   open_time::TEXT, close_time::TEXT,
+                   slot_interval_min, max_booking_days,
+                   created_at, updated_at",
     )
     .bind(shop_name)
     .bind(closed_weekdays)
@@ -206,7 +218,7 @@ pub async fn process_refund(
 
     let payment = sqlx::query_as::<_, Payment>(
         "UPDATE payments
-         SET status = CASE WHEN refund_amount_krw = amount_krw THEN 'CANCELLED' ELSE 'PARTIAL_CANCELLED' END,
+         SET status = CASE WHEN $1 = amount_krw THEN 'CANCELLED' ELSE 'PARTIAL_CANCELLED' END,
              refund_amount_krw = $1,
              refund_reason = $2,
              refunded_at = NOW(),

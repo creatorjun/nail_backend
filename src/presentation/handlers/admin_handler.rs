@@ -64,7 +64,9 @@ pub struct AddClosedDayRequest {
 pub struct UpdateShopSettingsRequest {
     pub shop_name: String,
     pub closed_weekdays: Vec<i32>,
+    /// HH:MM 형식 ex) "10:00"
     pub open_time: String,
+    /// HH:MM 형식 ex) "20:00"
     pub close_time: String,
     pub slot_interval_min: i32,
     pub max_booking_days: i32,
@@ -227,7 +229,9 @@ pub async fn update_booking_status(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateBookingStatusRequest>,
 ) -> impl IntoResponse {
-    match admin_service::update_booking_status(&pool, id, &req.status, req.admin_memo.as_deref()).await {
+    match admin_service::update_booking_status(&pool, id, &req.status, req.admin_memo.as_deref())
+        .await
+    {
         Ok(Some(data)) => (StatusCode::OK, Json(data)).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
@@ -252,7 +256,9 @@ pub async fn add_closed_day(
     Json(req): Json<AddClosedDayRequest>,
 ) -> impl IntoResponse {
     let day_type = req.day_type.as_deref().unwrap_or("TEMPORARY");
-    match admin_service::add_closed_day(&pool, req.closed_date, day_type, req.reason.as_deref()).await {
+    match admin_service::add_closed_day(&pool, req.closed_date, day_type, req.reason.as_deref())
+        .await
+    {
         Ok(data) => (StatusCode::CREATED, Json(data)).into_response(),
         Err(e) => {
             tracing::error!("{:?}", e);
@@ -289,24 +295,12 @@ pub async fn update_shop_settings(
     State(pool): State<PgPool>,
     Json(req): Json<UpdateShopSettingsRequest>,
 ) -> impl IntoResponse {
-    use sqlx::types::time::Time;
-    use std::str::FromStr;
-
-    let open_time = match Time::from_str(&req.open_time) {
-        Ok(t) => t,
-        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid open_time format. Use HH:MM").into_response(),
-    };
-    let close_time = match Time::from_str(&req.close_time) {
-        Ok(t) => t,
-        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid close_time format. Use HH:MM").into_response(),
-    };
-
     match admin_service::update_shop_settings(
         &pool,
         &req.shop_name,
         req.closed_weekdays,
-        open_time,
-        close_time,
+        &req.open_time,
+        &req.close_time,
         req.slot_interval_min,
         req.max_booking_days,
     )
@@ -325,9 +319,20 @@ pub async fn process_refund(
     Path(booking_id): Path<Uuid>,
     Json(req): Json<ProcessRefundRequest>,
 ) -> impl IntoResponse {
-    match admin_service::process_refund(&pool, booking_id, req.refund_amount_krw, &req.refund_reason).await {
+    match admin_service::process_refund(
+        &pool,
+        booking_id,
+        req.refund_amount_krw,
+        &req.refund_reason,
+    )
+    .await
+    {
         Ok(Some(data)) => (StatusCode::OK, Json(data)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "결제 완료된 예약을 찾을 수 없습니다").into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            "결제 완료된 예약을 찾을 수 없습니다",
+        )
+            .into_response(),
         Err(e) => {
             tracing::error!("{:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
