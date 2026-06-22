@@ -1,5 +1,7 @@
 // src/presentation/routes.rs
-use super::handlers::{admin_handler, auth_handler, booking_handler, service_handler, user_handler};
+use super::handlers::{
+    admin_handler, auth_handler, booking_handler, payment_handler, service_handler, user_handler,
+};
 use super::middleware::auth_middleware::{require_admin, require_auth};
 use axum::{
     middleware,
@@ -11,25 +13,37 @@ use sqlx::PgPool;
 pub fn create_router(pool: PgPool) -> Router {
     let public = Router::new()
         .route("/health", get(health_check))
+        // 소셜 로그인
         .route("/auth/naver", get(auth_handler::naver_oauth_url))
         .route("/auth/naver/callback", get(auth_handler::naver_callback))
         .route("/auth/kakao", get(auth_handler::kakao_oauth_url))
         .route("/auth/kakao/callback", get(auth_handler::kakao_callback))
         .route("/auth/refresh", post(auth_handler::refresh_token))
         .route("/auth/logout", post(auth_handler::logout))
+        // 공개 API
         .route("/api/categories", get(service_handler::list_categories))
         .route("/api/services", get(service_handler::list_services))
         .route("/api/services/:id", get(service_handler::get_service))
-        .route("/api/bookings/available-slots", get(booking_handler::get_available_slots));
+        .route("/api/bookings/available-slots", get(booking_handler::get_available_slots))
+        // 결제 콜백 (PG사에서 GET 리다이렉트)
+        .route("/api/payments/naver/approve", get(payment_handler::naver_pay_approve))
+        .route("/api/payments/kakao/approve", get(payment_handler::kakao_pay_approve))
+        .route("/api/payments/kakao/cancel", get(payment_handler::kakao_pay_cancel))
+        .route("/api/payments/kakao/fail", get(payment_handler::kakao_pay_fail));
 
     let user_protected = Router::new()
+        // 유저
         .route("/api/users/me", get(user_handler::get_me))
         .route("/api/users/link/naver", get(user_handler::link_naver))
         .route("/api/users/link/kakao", get(user_handler::link_kakao))
+        // 예약
         .route("/api/bookings", post(booking_handler::create_booking))
         .route("/api/bookings/my", get(booking_handler::get_my_bookings))
         .route("/api/bookings/:id", get(booking_handler::get_booking))
         .route("/api/bookings/:id/cancel", post(booking_handler::cancel_booking))
+        // 결제 요청
+        .route("/api/payments/naver/ready", post(payment_handler::naver_pay_ready))
+        .route("/api/payments/kakao/ready", post(payment_handler::kakao_pay_ready))
         .layer(middleware::from_fn(require_auth));
 
     let admin_protected = Router::new()

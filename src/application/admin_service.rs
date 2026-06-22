@@ -5,6 +5,8 @@ use crate::domain::payment::Payment;
 use crate::domain::service::Service;
 use crate::domain::service_category::ServiceCategory;
 use crate::domain::shop_settings::ShopSettings;
+use crate::application::payment_service;
+use anyhow::Result;
 use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -208,39 +210,12 @@ pub async fn update_shop_settings(
     .await
 }
 
+/// PG사 환불 API 실제 호출 후 DB 상태 변경
 pub async fn process_refund(
     pool: &PgPool,
     booking_id: Uuid,
     refund_amount_krw: i32,
     refund_reason: &str,
-) -> Result<Option<Payment>, sqlx::Error> {
-    let mut tx = pool.begin().await?;
-
-    let payment = sqlx::query_as::<_, Payment>(
-        "UPDATE payments
-         SET status = CASE WHEN $1 = amount_krw THEN 'CANCELLED' ELSE 'PARTIAL_CANCELLED' END,
-             refund_amount_krw = $1,
-             refund_reason = $2,
-             refunded_at = NOW(),
-             updated_at = NOW()
-         WHERE booking_id = $3 AND status = 'PAID'
-         RETURNING *",
-    )
-    .bind(refund_amount_krw)
-    .bind(refund_reason)
-    .bind(booking_id)
-    .fetch_optional(&mut *tx)
-    .await?;
-
-    if payment.is_some() {
-        sqlx::query(
-            "UPDATE bookings SET status = 'CANCELLED_BY_ADMIN', updated_at = NOW() WHERE id = $1",
-        )
-        .bind(booking_id)
-        .execute(&mut *tx)
-        .await?;
-    }
-
-    tx.commit().await?;
-    Ok(payment)
+) -> Result<Payment> {
+    payment_service::refund_payment(pool, booking_id, refund_amount_krw, refund_reason).await
 }
