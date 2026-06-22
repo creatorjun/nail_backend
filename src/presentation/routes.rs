@@ -1,5 +1,5 @@
 // src/presentation/routes.rs
-use super::handlers::{admin_handler, auth_handler, booking_handler, service_handler};
+use super::handlers::{admin_handler, auth_handler, booking_handler, service_handler, user_handler};
 use super::middleware::auth_middleware::{require_admin, require_auth};
 use axum::{
     middleware,
@@ -23,9 +23,13 @@ pub fn create_router(pool: PgPool) -> Router {
         .route("/api/bookings/available-slots", get(booking_handler::get_available_slots));
 
     let user_protected = Router::new()
+        .route("/api/users/me", get(user_handler::get_me))
+        .route("/api/users/link/naver", get(user_handler::link_naver))
+        .route("/api/users/link/kakao", get(user_handler::link_kakao))
         .route("/api/bookings", post(booking_handler::create_booking))
         .route("/api/bookings/my", get(booking_handler::get_my_bookings))
         .route("/api/bookings/:id", get(booking_handler::get_booking))
+        .route("/api/bookings/:id/cancel", post(booking_handler::cancel_booking))
         .layer(middleware::from_fn(require_auth));
 
     let admin_protected = Router::new()

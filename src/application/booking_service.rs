@@ -53,6 +53,25 @@ pub async fn get_booking_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Booking
         .await
 }
 
+pub async fn cancel_booking(
+    pool: &PgPool,
+    booking_id: Uuid,
+    user_id: Uuid,
+) -> Result<Option<Booking>, sqlx::Error> {
+    sqlx::query_as::<_, Booking>(
+        "UPDATE bookings
+         SET status = 'CANCELLED_BY_USER', updated_at = NOW()
+         WHERE id = $1
+           AND user_id = $2
+           AND status NOT IN ('CANCELLED_BY_USER', 'CANCELLED_BY_ADMIN', 'COMPLETED')
+         RETURNING *",
+    )
+    .bind(booking_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+}
+
 fn parse_time(s: &str) -> Option<NaiveTime> {
     NaiveTime::parse_from_str(s, "%H:%M")
         .or_else(|_| NaiveTime::parse_from_str(s, "%H:%M:%S"))
@@ -64,9 +83,15 @@ pub async fn get_available_slots(
     date: NaiveDate,
     service_id: Uuid,
 ) -> Result<AvailableSlotsResponse, sqlx::Error> {
-    let settings = sqlx::query_as::<_, ShopSettings>("SELECT * FROM shop_settings LIMIT 1")
-        .fetch_one(pool)
-        .await?;
+    let settings = sqlx::query_as::<_, ShopSettings>(
+        "SELECT id, shop_name, closed_weekdays,
+                open_time::TEXT, close_time::TEXT,
+                slot_interval_min, max_booking_days,
+                created_at, updated_at
+         FROM shop_settings LIMIT 1",
+    )
+    .fetch_one(pool)
+    .await?;
 
     let service = sqlx::query_as::<_, Service>("SELECT * FROM services WHERE id = $1 AND is_active = true")
         .bind(service_id)
@@ -86,8 +111,10 @@ pub async fn get_available_slots(
         return Ok(AvailableSlotsResponse { date, slots: vec![] });
     }
 
-    let open_naive = parse_time(&settings.open_time).unwrap_or_else(|| NaiveTime::from_hms_opt(10, 0, 0).unwrap());
-    let close_naive = parse_time(&settings.close_time).unwrap_or_else(|| NaiveTime::from_hms_opt(20, 0, 0).unwrap());
+    let open_naive = parse_time(&settings.open_time)
+        .unwrap_or_else(|| NaiveTime::from_hms_opt(10, 0, 0).unwrap());
+    let close_naive = parse_time(&settings.close_time)
+        .unwrap_or_else(|| NaiveTime::from_hms_opt(20, 0, 0).unwrap());
 
     let day_start = Utc.from_utc_datetime(&NaiveDateTime::new(date, open_naive));
     let day_end = Utc.from_utc_datetime(&NaiveDateTime::new(date, close_naive));
